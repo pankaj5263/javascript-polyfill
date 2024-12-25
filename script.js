@@ -99,3 +99,73 @@ Function.prototype.myBind = function(context,...args){
        context.fn = this;
        return () => context.fn(...args);
 }
+
+Object.prototype.myBind = function (context, ...args) {
+  if (typeof this !== 'function') {
+      throw new Error("This is not a function");
+  }
+  context = Object(context); // Ensure context is an object
+  let fun = Symbol(); // Unique property name to avoid collisions
+  context[fun] = this; // Assign the function to the context
+
+  return function (...newArgs) {
+      // Call the function with both initial and new arguments
+      return context[fun](...args, ...newArgs);
+  };
+};
+
+function show() {
+  console.log(this.name);
+}
+
+const bindFunction = show.myBind({ name: "pankaj" });
+bindFunction();
+
+
+// polyfill - once Function called
+
+function once(fn, context){
+   let ran;
+   return function(){
+      if(fn){
+        ran=fn.apply(context || this, arguments);
+        fn = null;
+      }
+      return ran;
+   }
+}
+const hello = () => console.log("hello once polyfill");
+const test = once(hello);
+
+// polifill for Promises
+
+
+function MyPromisePolyfill(executer){
+  let onResolve, onReject;
+
+  const resolve = (value) =>{
+    onResolve(value);
+  }
+
+  const reject = (value) =>{
+    onReject(value);
+  }
+
+  this.then = function(callback){
+    onResolve = callback;
+  }
+
+  this.catch = function(callback){
+    onReject = callback;
+  }
+
+executer(resolve, reject);
+}
+
+
+const promise = new MyPromisePolyfill((resolve, reject)=>{
+  setTimeout(()=>resolve(2), 4000);
+});
+
+promise.then((value) => console.log(value))
+      // .catch((error) => console.error(error));
