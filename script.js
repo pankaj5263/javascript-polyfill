@@ -139,7 +139,6 @@ const test = once(hello);
 
 // polifill for Promises
 
-
 function MyPromisePolyfill(executer){
   let onResolve, onReject;
 
@@ -153,10 +152,12 @@ function MyPromisePolyfill(executer){
 
   this.then = function(callback){
     onResolve = callback;
+    return this;
   }
 
   this.catch = function(callback){
     onReject = callback;
+    return this;
   }
 
 executer(resolve, reject);
@@ -164,8 +165,72 @@ executer(resolve, reject);
 
 
 const promise = new MyPromisePolyfill((resolve, reject)=>{
-  setTimeout(()=>resolve(2), 4000);
+  setTimeout(()=>reject(2), 4000);
 });
 
-promise.then((value) => console.log(value))
-      // .catch((error) => console.error(error));
+promise.then((value) => console.log(value)).catch((value) => console.error(value));
+
+
+
+function MyPromisePolyfill(executor) {
+  let state = 'pending';
+  let value;
+  let handlers = [];
+  let catchers = [];
+
+  const resolve = (result) => {
+    if (state !== 'pending') return;
+    state = 'fulfilled';
+    value = result;
+
+    handlers.forEach((handler) => handler(value));
+  };
+
+  const reject = (error) => {
+    if (state !== 'pending') return;
+    state = 'rejected';
+    value = error;
+
+    catchers.forEach((catcher) => catcher(value));
+  };
+
+  this.then = function (callback) {
+    return new MyPromisePolyfill((resolve, reject) => {
+      handlers.push((result) => {
+        try {
+          const nextValue = callback(result);
+          resolve(nextValue);
+        } catch (err) {
+          reject(err);
+        }
+      });
+
+      if (state === 'fulfilled') {
+        handlers.forEach((handler) => handler(value));
+      }
+    });
+  };
+
+  this.catch = function (callback) {
+    return new MyPromisePolyfill((resolve, reject) => {
+      catchers.push((error) => {
+        try {
+          const nextValue = callback(error);
+          resolve(nextValue);
+        } catch (err) {
+          reject(err);
+        }
+      });
+
+      if (state === 'rejected') {
+        catchers.forEach((catcher) => catcher(value));
+      }
+    });
+  };
+
+  try {
+    executor(resolve, reject);
+  } catch (err) {
+    reject(err);
+  }
+}
